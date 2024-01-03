@@ -1,8 +1,8 @@
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import classNames from "classnames/bind";
 import styles from "./ProductItem.module.scss";
 import { moneyFormat } from "../../utils/appHelper";
-import { Product, ProductStorage } from "@/types";
+import { Product, ProductCombine, ProductStorage } from "@/types";
 import { useState } from "react";
 //
 
@@ -13,13 +13,15 @@ type Props = {
    preview?: boolean;
 };
 
-const findActiveVar = (storages: ProductStorage[] | undefined) => {
-   if (!storages) return undefined;
-   return storages.find((v) => v.default);
+const findActiveVar = (storages: ProductStorage[] | undefined, combines: ProductCombine[] | undefined) => {
+   if (!storages || !combines) return undefined;
+   return storages.find((s) => s.id === combines[0].storage_id);
 };
 
 export default function ProductItem({ data, preview }: Props) {
-   const [activeVar, setActiveVar] = useState(findActiveVar(data.storages_data));
+   const [activeVar, setActiveVar] = useState(findActiveVar(data.storages_data, data.combines_data));
+
+   const { category_ascii } = useParams<{ category_ascii: string }>();
 
    // console.log('check data', data);
    
@@ -33,7 +35,7 @@ export default function ProductItem({ data, preview }: Props) {
             </div>
          ) : (
             <Link
-               to={`/${data.category_name_ascii}/${data.product_name_ascii}?${activeVar?.storage_ascii || ""}`}
+               to={`/${category_ascii}/${data.product_name_ascii}?${activeVar?.storage_ascii || ""}`}
                className={cx("product-item-frame")}
             >
                <img className={cx("product-item-image")} src={data.image_url || "https://placehold.co/300X400"} />

@@ -1,21 +1,21 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import * as productServices from "../services/productServices";
-import searchService from "../services/searchService";
+// import searchService from "../services/searchService";
 import { Product, ProductStorage } from "@/types";
 import { FilterType, SortType } from "./filtersSlice";
 import { sleep } from "@/utils/appHelper";
 
-type ProductState = {
+export type ProductState = {
    products: Product[];
    count: number;
    pageSize: number;
    variants_data: (ProductStorage & { product_name_ascii: string })[];
 };
 
-type StateType = {
+export type StateType = {
    status: "idle" | "loading" | "more-loading" | "successful" | "error";
    productState: ProductState;
-   category: string;
+   category_id: number | undefined;
    page: number;
 };
 
@@ -27,67 +27,73 @@ const initialState: StateType = {
       pageSize: 0,
       variants_data: [],
    },
-   category: "",
+   category_id: undefined,
    page: 1,
 };
 
 export type Param = {
    filters: FilterType;
-   category: string;
+   category_id: number | undefined;
    page: number;
    sort: SortType;
    admin?: boolean;
 };
 
 export const fetchProducts = createAsyncThunk("/products/getProducts", async (param: Param) => {
-   try {
-      let response: ProductState;
-      const { admin, ...rest } = param;
-      if (param.category.includes("search")) {
-         const key = param.category.split("search=")[1]; //search=iphone 14
-         response = await searchService({
-            q: key,
-            page: param.page,
-            sort: param.sort,
-         });
-      } else {
-         if (admin) {
-            response = await productServices.getProductsAdmin({
-               ...rest,
-            });
-         } else {
-            response = await productServices.getProducts({
-               ...rest,
-            });
-         }
-      }
-      if (import.meta.env.DEV) await sleep(300);
+   console.log('fetch Products check param', param);
+   
+   let response: ProductState;
+   const { admin, ...rest } = param;
 
-      return { productState: response, ...rest, admin };
-   } catch (error) {
-      console.log("fetchProducts error", error);
+   if (import.meta.env.DEV) await sleep(300);
+
+   // if (param.category.includes("search")) {
+   //    const key = param.category.split("search=")[1]; //search=iphone 14
+   //    response = await searchService({
+   //       q: key,
+   //       page: param.page,
+   //       sort: param.sort,
+   //    });
+   // } else {
+   if (admin) {
+      response = await productServices.getProductsAdmin({
+         ...rest,
+      });
+   } else {
+      response = await productServices.getProducts({
+         ...rest,
+      });
    }
+   // }
+
+   return { productState: response, ...rest, admin };
 });
 
 // product.rows.push
 export const getMoreProducts = createAsyncThunk("/products/getMoreProducts", async (param: Param) => {
-   try {
-      let response: ProductState;
-      const { admin, ...rest } = param;
-      if (param.category.includes("search")) {
-         console.log("include search");
-         const key = param.category.split("search=")[1]; //search=iphone 14
-         response = await searchService({ q: key, page: param.page, sort: param.sort });
-      } else {
-         response = await productServices.getProducts(param);
-      }
+   let response: ProductState;
+   const { admin, ...rest } = param;
+   // if (param.category.includes("search")) {
+   // console.log("include search");
+   // const key = param.category.split("search=")[1]; //search=iphone 14
+   // response = await searchService({ q: key, page: param.page, sort: param.sort });
+   // } else {
+   // response = await productServices.getProducts(rest);
+   // }
 
-      if (import.meta.env.DEV) await sleep(300);
-
-      return { productState: response, ...param, admin };
-   } catch (error) {
-      console.log("fetchProducts error", error);
+   if (admin) {
+      response = await productServices.getProductsAdmin({
+         ...rest,
+      });
+   } else {
+      response = await productServices.getProducts({
+         ...rest,
+      });
    }
+
+   if (import.meta.env.DEV) await sleep(300);
+
+   return { productState: response, ...param, admin };
 });
 
 const mergeVariantToProduct = (
@@ -103,7 +109,7 @@ const mergeVariantToProduct = (
       );
 
       if (filteredStorages_data.length) {
-         const newP = { ...p, storages_data: [...p.storages_data, ...filteredStorages_data] } as Product;
+         const newP = { ...p, storages_data: filteredStorages_data } as Product;
          newProducts[i] = newP;
       }
    }
@@ -111,19 +117,21 @@ const mergeVariantToProduct = (
    return newProducts;
 };
 
+type PayLoadType = {
+   products: Product[];
+};
+
 const productsSlice = createSlice({
    name: "products",
    initialState,
    reducers: {
-      storingProducts(state, action: PayloadAction<StateType>) {
+      storingProducts(state, action: PayloadAction<PayLoadType>) {
          const payload = action.payload;
-
-         state.productState.count = payload.productState.count || state.productState.count;
-         state.productState.products.push(...payload.productState.products);
-
-         state.status = "successful";
-         state.page = payload.page;
-         state.category = payload.category || "";
+         state.productState.products.push(...payload.products);
+      },
+      setProducts(state, action: PayloadAction<PayLoadType>) {
+         const payload = action.payload;
+         state.productState.products = payload.products;
       },
    },
    extraReducers: (builder) => {
@@ -141,8 +149,8 @@ const productsSlice = createSlice({
 
             state.status = "successful";
             state.page = payload.page || 1;
-            state.category = payload.category || "";
-            state.productState.count = productState.count;
+            state.category_id = payload.category_id || state.category_id;
+            state.productState.count = productState.count || 0;
 
             if (!payload.admin) {
                if (!!productState.variants_data.length) {
@@ -156,6 +164,8 @@ const productsSlice = createSlice({
             state.productState.products = productState.products;
          })
          .addCase(fetchProducts.rejected, (state) => {
+            console.log("rejecrt case");
+
             state.status = "error";
          })
 
@@ -168,12 +178,12 @@ const productsSlice = createSlice({
             const payload = action.payload;
             if (!payload) return state;
 
-            state.productState.count = payload.productState.count;
+            state.productState.count = payload.productState.count || 0;
             state.productState.products.push(...payload.productState.products);
 
             state.status = "successful";
             state.page = payload.page;
-            state.category = payload.category || "";
+            state.category_id = payload.category_id || 0;
          })
          .addCase(getMoreProducts.rejected, (state) => {
             state.status = "error";
@@ -185,6 +195,6 @@ export const selectedAllProduct = (state: { products: StateType }) => {
    return state.products;
 };
 
-export const { storingProducts } = productsSlice.actions;
+export const { storingProducts, setProducts } = productsSlice.actions;
 
 export default productsSlice.reducer;

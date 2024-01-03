@@ -1,100 +1,166 @@
 import classNames from "classnames/bind";
 import styles from "./Brand.module.scss";
-import inputStyles from "@/components/ui/Input/Input.module.scss";
-import { useEffect, useRef, useState } from "react";
-import { Brand, Category } from "@/types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Brand, Category, GetArrayType } from "@/types";
 import { usePrivateRequest } from "@/hooks";
-import Empty from "@/components/ui/Empty";
-import { Button, Gallery, Modal, QuickFilter } from "@/components";
-import MyInput from "@/components/ui/Input";
+import { Modal, Empty } from "@/components";
+import { inputClasses } from "@/components/ui/Input";
 import { generateId } from "@/utils/appHelper";
+import AddItemMulti from "@/components/Modal/AddItemMulti";
+import { useToast } from "@/store/ToastContext";
+import OverlayCTA from "@/components/ui/OverlayCTA";
+import ConfirmModal from "@/components/Modal/Confirm";
+import useBrandAction from "@/hooks/useBrand";
+import EditBrand from "./child/EditBrand";
 const cx = classNames.bind(styles);
-const inputCx = classNames.bind(inputStyles);
 
-const CAT_URL = "/app/category";
-const BRAND_URL = "/app/brand";
+const CAT_URL = "/app/categories";
+const BRAND_URL = "/app/brands";
+const CAT_FIELDS: ["Name", "Icon"] = ["Name", "Icon"];
+
+type ModalTarget = "add-brand" | "add-category" | "edit-category" | "delete-category" | "delete-brand" | "edit-brand";
 
 export default function CategoryBrand() {
-   const [curCategory, setCurCategory] = useState("");
+   const [curCategoryId, setCurCategoryId] = useState(0);
    const [categories, setCategories] = useState<Category[]>([]);
-   const [catData, setCatData] = useState<Category>({ category_name: "", category_name_ascii: "", icon: "" });
-   const [brandData, setBrandData] = useState<Brand>({ brand_name: "", brand_name_ascii: "", image_url: "" });
    const [brands, setBrands] = useState<Brand[]>([]);
-
    const [isOpenModal, setIsOpenModal] = useState(false);
 
    const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
 
-   const [catLoading, setCatLoading] = useState(false);
-   const [brandLoading, setBrandLoading] = useState(false);
-
+   const openModalTarget = useRef<ModalTarget | "">("");
    const ranUseEffect = useRef(false);
-   const categoryRef = useRef<HTMLInputElement>(null);
-   const brandRef = useRef<HTMLInputElement>(null);
+   const curCatIndex = useRef<number>(0);
+   const curBrandIndex = useRef<number>();
 
+   // hooks
+   const { deleteBrand, deleteCategory, addCategory, addBrand, apiLoading } = useBrandAction({
+      brands,
+      setBrands,
+      categories,
+      setCategories,
+      setIsOpenModal,
+   });
    const privateRequest = usePrivateRequest();
+   const { setErrorToast } = useToast();
 
-   const handleBrandInput = (field: keyof typeof brandData, value: string) => {
-      setBrandData({ ...brandData, [field]: value });
-   };
+   const handleOpenModal = (target: typeof openModalTarget.current, index?: number) => {
+      openModalTarget.current = target;
+      switch (target) {
+         case "edit-category":
+         case "delete-category":
+            curCatIndex.current = index || 0;
+            break;
 
-   const handleCatInput = (field: keyof typeof catData, value: string) => {
-      setCatData({ ...catData, [field]: value });
-   };
-   const handleAddCategory = async () => {
-      try {
-         setCatLoading(true);
-         if (!catData.category_name.trim()) return;
-         const newCategory: Category = { ...catData, category_name_ascii: generateId(catData.category_name) };
-
-         await privateRequest.post(CAT_URL, newCategory);
-
-         setCategories((prev) => [...prev, newCategory]);
-      } catch (error) {
-         console.log({ message: error });
-      } finally {
-         setCatLoading(false);
+         case "edit-brand":
+         case "delete-brand":
+            curBrandIndex.current = index || undefined;
+            break;
       }
+      setIsOpenModal(true);
    };
 
-   const deleteCategory = async (category_name_ascii: string) => {
-      try {
-         setCatLoading(true);
+   const getFieldValue = (value: Record<string, string>, name: GetArrayType<typeof CAT_FIELDS>) => {
+      return value[generateId(name)];
+   };
 
-         await privateRequest.get(CAT_URL + "/delete/" + category_name_ascii);
-         const newCategories = categories.filter((c) => c.category_name_ascii !== category_name_ascii);
-         setCategories(newCategories);
-      } catch (error) {
-         console.log({ message: error });
-      } finally {
-         setCatLoading(false);
+   const handleAddCategory = async (value: Record<string, string>, type: "Add" | "Edit") => {
+      if (!value[generateId("Name")].trim()) {
+         setErrorToast();
+         return;
       }
+
+      const newCategory: Category = {
+         category_name: getFieldValue(value, "Name"),
+         category_ascii: generateId(getFieldValue(value, "Name")),
+         icon: getFieldValue(value, "Icon"),
+         id: type === "Add" ? undefined : (categories[curCatIndex.current].id as number),
+      };
+
+      await addCategory(newCategory, type, curCatIndex.current);
    };
 
-   const handleChoseBrandImage = (image_url: string) => {
-      handleBrandInput("image_url", image_url);
+   const handleDeleteCategory = async () => {
+      await deleteCategory(categories[curCatIndex.current]);
    };
 
-   const handleAddBrand = async () => {
-      try {
-         setBrandLoading(true);
-         if (!brandData.brand_name.trim()) return;
+   const handleDeleteBrand = async () => {
+      await deleteBrand(curBrandIndex.current);
+   };
 
-         const fullBrandData: Brand & { category_name_ascii: string } = {
-            ...brandData,
-            brand_name_ascii: generateId(brandData.brand_name),
-            category_name_ascii: curCategory,
-         };
+   const renderModal = useMemo(() => {
+      if (!isOpenModal) return;
+      switch (openModalTarget.current) {
+         case "add-brand":
+            return (
+               <EditBrand
+                  type={"Add"}
+                  addBrand={addBrand}
+                  apiLoading={apiLoading}
+                  setIsOpenModalParent={setIsOpenModal}
+                  catId={curCategoryId}
+               />
+            );
+         case "add-category":
+            return (
+               <AddItemMulti
+                  fields={CAT_FIELDS}
+                  title="Add category"
+                  cb={(value) => handleAddCategory(value, "Add")}
+                  setIsOpenModal={setIsOpenModal}
+               />
+            );
+         case "edit-brand":
+            if (!curBrandIndex.current) return "Index not found";
+            return (
+               <EditBrand
+                  type={"Edit"}
+                  addBrand={addBrand}
+                  apiLoading={apiLoading}
+                  setIsOpenModalParent={setIsOpenModal}
+                  curBrand={{ ...brands[curBrandIndex.current], curIndex: curBrandIndex.current }}
+                  catId={curCategoryId}
+               />
+            );
 
-         await privateRequest.post(BRAND_URL, fullBrandData);
+         case "edit-category":
+            return (
+               <AddItemMulti
+                  fields={CAT_FIELDS}
+                  title="Edit category"
+                  cb={(value) => handleAddCategory(value, "Edit")}
+                  setIsOpenModal={setIsOpenModal}
+                  intiFieldData={{
+                     name: categories[curCatIndex.current].category_name,
+                     icon: categories[curCatIndex.current].icon,
+                  }}
+               />
+            );
+         case "delete-category":
+            return (
+               <ConfirmModal
+                  callback={handleDeleteCategory}
+                  loading={apiLoading}
+                  setOpenModal={setIsOpenModal}
+                  label={`Delete category '${categories[curCatIndex.current].category_name}'`}
+               />
+            );
+         case "delete-brand":
+            if (!curBrandIndex.current) return "Index not found";
 
-         setBrands((prev) => [...prev, fullBrandData]);
-      } catch (error) {
-         console.log({ message: error });
-      } finally {
-         setBrandLoading(false);
+            return (
+               <ConfirmModal
+                  callback={handleDeleteBrand}
+                  loading={apiLoading}
+                  setOpenModal={setIsOpenModal}
+                  label={`Delete brand '${brands[curBrandIndex.current].brand_name}'`}
+               />
+            );
+
+         default:
+            return <h1 className="text-3xl">Not thing to show</h1>;
       }
-   };
+   }, [isOpenModal]);
 
    useEffect(() => {
       const getConfig = async () => {
@@ -104,7 +170,7 @@ export default function CategoryBrand() {
 
             if (categories.length > 0) {
                setCategories(categoriesRes.data || []);
-               setCurCategory(categories[0].category_name_ascii);
+               setCurCategoryId(categories[0].id || 0);
             }
             setStatus("success");
          } catch (error) {
@@ -122,7 +188,7 @@ export default function CategoryBrand() {
    useEffect(() => {
       const getBrands = async () => {
          try {
-            const brandsRes = await privateRequest.get(BRAND_URL + "?category=" + curCategory);
+            const brandsRes = await privateRequest.get(BRAND_URL + "?category_id=" + curCategoryId);
             const brandsData = brandsRes.data as Brand[];
 
             setBrands(brandsData);
@@ -131,142 +197,105 @@ export default function CategoryBrand() {
          }
       };
 
-      if (curCategory) {
+      if (curCategoryId) {
          getBrands();
       }
-   }, [curCategory]);
+   }, [curCategoryId]);
 
    if (status === "loading") return <h2>Loading...</h2>;
 
    if (status === "error") return <h1>Some thing went wrong</h1>;
 
+   console.log("check brands", brands);
+
    return (
-      <>
-         <div className="">
-            <h1 className={cx("page-title")}>Category</h1>
-            <br />
+      <div className="pb-[30px]">
+         <h1 className={cx("page-title")}>Category</h1>
 
-            <div className={`row ${catLoading && "disable"}`}>
-               <div className="col col-3">
-                  <p className={cx("input-label")}>Add new category</p>
-                  <MyInput
-                     placeholder="Category name"
-                     ref={categoryRef}
-                     className="mb-10"
-                     cb={(value) => handleCatInput("category_name", value)}
-                     value={catData.category_name}
-                  />
-                  <div className={cx("icon-input")}>
-                     <MyInput
-                        placeholder="Icon"
-                        className="mb-10"
-                        cb={(value) => handleCatInput("icon", value)}
-                        value={catData.icon}
+         <div className={`row bg-white p-[20px] rounded-[8px] mb-[30px] ${apiLoading && "disable"}`}>
+            {categories.map((item, index) => (
+               <div key={index} className="col w-2/12">
+                  <Empty className="group">
+                     <span className="text-[16px] font-semibold">{item.category_name}</span>
+                     <OverlayCTA
+                        data={[
+                           {
+                              cb: () => handleOpenModal("delete-category", index),
+                              icon: "delete",
+                           },
+                           {
+                              cb: () => handleOpenModal("edit-category", index),
+                              icon: "edit",
+                           },
+                        ]}
                      />
-                     <div className="">{catData.icon && <i className="material-icons">{catData.icon}</i>}</div>
-                  </div>
-
-                  <br />
-                  <br />
-                  <br />
-
-                  <Button disable={!catData.category_name} onClick={handleAddCategory} rounded fill>
-                     <i className="material-icons">save</i> Add
-                  </Button>
+                  </Empty>
                </div>
-
-               <div className="col col-9">
-                  <div className={`row`}>
-                     {status === "success" &&
-                        categories &&
-                        categories.map((item, index) => (
-                           <div key={index} className="col col-3">
-                              <Empty onClick={() => deleteCategory(item.category_name_ascii)}>
-                                 <div className={cx("cat-item")}>
-                                    {item.icon && <i className="material-icons">{item.icon}</i>}
-                                    {item.category_name}
-                                 </div>
-                              </Empty>
-                           </div>
-                        ))}
-                     <div className="col col-3">
-                        <Empty onClick={() => categoryRef.current?.focus()} />
-                     </div>
-                  </div>
-               </div>
+            ))}
+            <div className="col w-2/12">
+               <Empty onClick={() => handleOpenModal("add-category")} />
             </div>
          </div>
 
          {/* <div className={cx("divide")}></div> */}
 
-         <div className="">
-            <h1 className={cx("page-title")}>Brand</h1>
-            <br />
+         <h1 className={cx("page-title")}>Brand</h1>
+         {status === "success" && curCategoryId && (
+            <div className="bg-[#fff]  rounded-[8px] p-[20px]">
+               <div className="mb-[15px] flex items-center">
+                  <p className={cx("input-label", "mr-[10px]")}>Category: </p>
+                  <select
+                     className={inputClasses.input}
+                     name="category"
+                     value={curCategoryId}
+                     onChange={(e) => setCurCategoryId(+e.target.value)}
+                  >
+                     {!!categories.length &&
+                        categories.map((category, index) => (
+                           <option key={index} value={category.id}>
+                              {category.category_name}
+                           </option>
+                        ))}
+                  </select>
+               </div>
+               <div className={`row  ${apiLoading && "disable"}`}>
+                  <div className="col col-9">
+                     <div className="row">
+                        {status === "success" &&
+                           !!brands.length &&
+                           brands.map((brand, index) => (
+                              <div key={index} className="col col-2">
+                                 <Empty>
+                                    <div className="">
+                                       <p className="text-[14px] text-center">{brand.brand_name}</p>
+                                       <img src={brand.image_url} alt="" />
+                                    </div>
+                                    <OverlayCTA
+                                       data={[
+                                          {
+                                             cb: () => handleOpenModal("delete-brand", index),
+                                             icon: "delete",
+                                          },
+                                          {
+                                             cb: () => handleOpenModal("edit-brand", index),
+                                             icon: "edit",
+                                          },
+                                       ]}
+                                    />
+                                 </Empty>
+                              </div>
+                           ))}
 
-            {status === "success" && curCategory && (
-               <>
-                  <div className={`row ${brandLoading && "disable"}`}>
-                     <div className="col col-3">
-                        <div className={inputCx("form-group", "mb-15")}>
-                           <p className={cx("input-label")}>Category</p>
-                           <select name="category" value={curCategory} onChange={(e) => setCurCategory(e.target.value)}>
-                              {!!categories.length &&
-                                 categories.map((category, index) => (
-                                    <option key={index} value={category.category_name_ascii}>
-                                       {category.category_name}
-                                    </option>
-                                 ))}
-                           </select>
-                        </div>
-                        <p className={cx("input-label")}>Add new brand</p>
-                        <MyInput
-                           ref={brandRef}
-                           placeholder="Brand name"
-                           className="mb-10"
-                           cb={(value) => handleBrandInput("brand_name", value)}
-                           value={brandData.brand_name}
-                        />
-
-                        {brandData.image_url && (
-                           <div className={cx("brand-image")}>
-                              <img src={brandData.image_url} />
-                              <button>
-                                 <i className="material-icons">delete</i>
-                              </button>
-                           </div>
-                        )}
-
-                        {!brandData.image_url && (
-                           <Button onClick={() => setIsOpenModal(true)} rounded fill>
-                              Choose image
-                           </Button>
-                        )}
-
-                        <br />
-                        <br />
-                        <br />
-                        <Button onClick={handleAddBrand} disable={!brandData.brand_name} className="mt-15" rounded fill>
-                           <i className="material-icons">save</i>
-                           Add
-                        </Button>
-                     </div>
-                     <div className="col col-9">
-                        <div className="row">
-                           {status === "success" && !!brands.length && (
-                              <QuickFilter loading={false} category="" admin brands={brands} />
-                           )}
+                        <div className="col col-2">
+                           <Empty onClick={() => handleOpenModal("add-brand")} />
                         </div>
                      </div>
                   </div>
-               </>
-            )}
-         </div>
-
-         {isOpenModal && (
-            <Modal setShowModal={setIsOpenModal}>
-               <Gallery setIsOpenModal={setIsOpenModal} setImageUrl={handleChoseBrandImage} />
-            </Modal>
+               </div>
+            </div>
          )}
-      </>
+
+         {isOpenModal && <Modal setShowModal={setIsOpenModal}>{renderModal}</Modal>}
+      </div>
    );
 }

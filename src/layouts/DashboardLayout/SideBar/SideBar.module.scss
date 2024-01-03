@@ -1,4 +1,4 @@
-.sibebar {
+.sidebar {
     width: 180px;
     position: fixed;
     left: 0;
@@ -7,10 +7,11 @@
     background-color: #333;
     color: #fff;
     .logo {
-      font-weight: 900;
+      font-weight: bolder;
       line-height: 60px;
       margin-left: 12px;
-      
+      letter-spacing: -1px;
+      font-size: 22px;
     }
     &__item {
        display: flex;

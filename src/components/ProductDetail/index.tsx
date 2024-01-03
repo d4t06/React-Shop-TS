@@ -35,7 +35,7 @@ function DetailProductItem({ data }: Props) {
          <div className={cx("row", "main-contain")}>
             <div className={cx("col-large col-6", "box_left")}>
                {!!sliderImages.length && <ImageSlider data={sliderImages} />}
-            </div>
+            </div>   
             <div className={cx("col-large col-6", "box_right")}>
                <h1 className={cx("product-name")}>{data.product_name}</h1>
 
@@ -48,7 +48,7 @@ function DetailProductItem({ data }: Props) {
                   query={st as string}
                />
                <div className={cx("product-cta")}>
-                  <Button fill rounded full onClick={() => setShowModal(true)}>
+                  <Button className="w-[100%]" onClick={() => setShowModal(true)}>
                      Mua Ngay
                   </Button>
                </div>

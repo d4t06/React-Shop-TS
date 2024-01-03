@@ -116,25 +116,28 @@
 }
 .variant-box {
    display: flex;
+   gap: 6px;
    margin: 6px 0;
    li {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.4rem;
 
-      width: 33.33%;
-      cursor: pointer;
-      border-radius: 4px;
       min-height: 30px;
-      background-color: #e8e8e8;
+      width: 33.33%;
+
+      font-size: 1.4rem;
+      border-radius: 99px;
+      border: 1px solid rgba($color: #000000, $alpha: 0.1);
+      cursor: pointer;
+
       &.active {
          @include active-variant();
       }
       &:hover {
          color: #cd1818;
+         border-color: #cd1818;
          font-weight: bold;
-         border: 1px solid rgba($color: #000000, $alpha: 0.1);
       }
    }
 }

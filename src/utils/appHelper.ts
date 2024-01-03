@@ -1,4 +1,4 @@
-import { Product, ProductColor, ProductCombine, ProductSlider, ProductStorage } from "@/types";
+import { Brand, ProductColor, ProductCombine, ProductSchema, ProductSlider, ProductStorage } from "@/types";
 
 export const sleep = (time: number) =>
    new Promise<void>((rs) => {
@@ -13,18 +13,14 @@ export const moneyFormat = (money: string | number) => {
    return formatter.format(+money);
 };
 
-export const initProductObject = (data: Partial<Product>) => {
-   const newProduct: Product = {
-      brand_name_ascii: "",
+export const initProductObject = (data: Partial<ProductSchema>) => {
+   const newProduct: ProductSchema = {
       product_name_ascii: "",
-      category_name_ascii: "",
       image_url: "",
       installment: false,
       product_name: "",
-      storages_data: [],
-      colors_data: [],
-      combines_data: [],
-      sliders_data: [],
+      brand_id: 0,
+      category_id: 0,
       ...data,
    };
 
@@ -33,7 +29,9 @@ export const initProductObject = (data: Partial<Product>) => {
 
 export const initStorageObject = (data: Partial<ProductStorage>) => {
    const initStorage: ProductStorage = {
+      id: undefined,
       base_price: 0,
+      product_name_ascii: "",
       default: false,
       storage: "",
       storage_ascii: "",
@@ -46,6 +44,8 @@ export const initStorageObject = (data: Partial<ProductStorage>) => {
 export const initColorObject = (data: Partial<ProductColor>) => {
    const newColor: ProductColor = {
       color: "",
+      id: undefined,
+      product_name_ascii: "",
       color_ascii: "",
       default: false,
       ...data,
@@ -54,27 +54,37 @@ export const initColorObject = (data: Partial<ProductColor>) => {
    return newColor;
 };
 
-export const initCombineData = (data: Partial<ProductCombine>) => {
+export function initCombineData(data: Partial<ProductCombine>, color: string, storage: string) {
+   // eliminate in order to prevent replace data
+   const { storage_data, color_data, ...rest } = data;
    const combineData: ProductCombine = {
+      id: undefined,
+      default: false,
       price: 0,
-      color_ascii: '',
-      storage_ascii: '',
+      color_id: 0,
+      storage_id: 0,
       product_name_ascii: "",
       quantity: 0,
+      color_data: { color, color_ascii: generateId(color) },
+      storage_data: { storage, storage_ascii: generateId(storage) },
+      ...rest,
+   };
+
+   return combineData;
+}
+
+export const initProductSlider = (data: Partial<ProductSlider>) => {
+   const productSlider: ProductSlider = {
+      color_id: 0,
+      id: 0,
+      product_name_ascii: "",
+      slider_id: 0,
+      color_data: { color: "", color_ascii: "" },
+      slider_data: { images: [], slider_name: "", id: 0 },
       ...data,
    };
 
-   return combineData;
-};
-
-export const initProductSlider = (slider_id: number, color_id: number, product_name_ascii: string) => {
-   const combineData: ProductSlider & {product_name_ascii: string} = {
-      color_id, 
-      slider_id,
-      product_name_ascii
-   };
-
-   return combineData;
+   return productSlider;
 };
 
 export const generateId = (name: string): string => {
@@ -91,4 +101,16 @@ export const generateId = (name: string): string => {
       return newString;
    };
    return convertToEn(name).replaceAll(/[\W_]/g, "-");
+};
+
+export const initBrandObject = (data: Partial<Brand>) => {
+   const object: Brand = {
+      brand_name: "",
+      brand_ascii: "",
+      image_url: "",
+      category_id: 0,
+      ...data,
+   };
+
+   return object;
 };

@@ -4,8 +4,9 @@ $alpha: rgba(
 );
 
 .page-title {
-   font-size: 3rem;
-   font-weight: bolder;
+   font-size: 2.2rem;
+   font-weight: 500;
+   margin-bottom: 10px;
 }
 .category-choose {
    margin: 10px 0;
@@ -16,7 +17,8 @@ $alpha: rgba(
    }
 }
 .input-label {
-   font-size: 2rem;
+   font-size: 1.6rem;
+   font-weight: 500;
    color: #333;
    margin-bottom: 4px;
 }
@@ -48,18 +50,6 @@ $alpha: rgba(
       height: auto;
       border: 1px solid $alpha;
       border-radius: 99px;
-   }
-   button {
-      margin-left: 12px;
-      background-color: transparent;
-      i {
-         font-size: 3rem;
-      }
-      &:hover {
-         i {
-            color: #cd1818;
-         }
-      }
    }
 }
 

@@ -13,18 +13,15 @@ type Props = {
    combines: ProductCombine[];
    sliders: ProductSlider[];
    setSliderImages: Dispatch<SetStateAction<string[]>>;
-   query: string | undefined
+   query: string | undefined;
 };
 
 type CurVar = { storage_id: number; color_id: number };
 
-const findDefaultCombine = (colors: ProductColor[], storages: ProductStorage[]): CurVar | undefined => {
-   const curColor = colors.find((color) => color.default);
-   const curStorage = storages.find((storage) => storage.default);
+const findDefaultCombine = (combines: ProductCombine[]): CurVar | undefined => {
+   const defaultCombine = combines.find((cb) => cb.default);
 
-   if (!curColor || !curStorage) return;
-
-   return { color_id: curColor.id as number, storage_id: curStorage.id as number };
+   return { color_id: defaultCombine?.color_id as number, storage_id: defaultCombine?.storage_id as number };
 };
 
 const getCurrentCombine = (curVar: CurVar, combines: ProductCombine[]) => {
@@ -32,7 +29,7 @@ const getCurrentCombine = (curVar: CurVar, combines: ProductCombine[]) => {
 };
 
 export default function ProductVariantList({ colors, storages, combines, setSliderImages, sliders, query }: Props) {
-   const [curVar, setCurVar] = useState<CurVar | undefined>(findDefaultCombine(colors, storages));
+   const [curVar, setCurVar] = useState<CurVar | undefined>(findDefaultCombine(combines));
 
    const curCombineData = useMemo(() => (curVar ? getCurrentCombine(curVar, combines) : undefined), [curVar]);
 

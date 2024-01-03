@@ -1,27 +1,38 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import classNames from "classnames/bind";
 import styles from "../Login/Login.module.scss";
-import stylesMain from "../AddProduct/AddProduct.module.scss";
 
-import { initProductSlider, sleep } from "@/utils/appHelper";
+import { generateId, initColorObject, initStorageObject, moneyFormat, sleep } from "@/utils/appHelper";
 import usePrivateRequest from "@/hooks/usePrivateRequest";
 import ProductConfig, { ConfigRef } from "@/components/ProductConfig";
-import { Product, ProductColor, ProductStorage } from "@/types";
+import { Product, ProductColor, ProductCombine, ProductCombineSchema, ProductStorage } from "@/types";
 import Empty from "@/components/ui/Empty";
 import { Button, Modal } from "@/components";
 import ProductDataProvider from "@/store/ProductDataContext";
-import { initColorsData, initStorageData, trackingColors, trackingStorages } from "@/utils/productHelper";
+import {
+   findMinCombineOfStorage,
+   initCombinesForInsert,
+   initProductSlidersForInsert,
+   trackingColors,
+   trackingStorages,
+} from "@/utils/productHelper";
 import { useToast } from "@/store/ToastContext";
 import AddItem from "@/components/Modal/AddItem";
+import OverlayCTA from "@/components/ui/OverlayCTA";
+import useVariantAction from "@/hooks/useVariantAction";
+import ConfirmModal from "@/components/Modal/Confirm";
+
+type ModelTarget = "add-storage" | "edit-storage" | "add-color" | "edit-color" | "delete-storage" | "delete-color";
 
 const cx = classNames.bind(styles);
-
-const STORAGE_URL = "/storage-management";
-const COLOR_URL = "/color-management";
-const PRODUCT_SLIDER_URL = "/product-slider-management";
-const COMBINE_URL = "/combine-management";
+const MAX_VAL = 999999999;
+const STORAGE_URL = "/storage-management/storages";
+// const COLOR_URL = "/color-management/colors";
+const PRODUCT_SLIDER_URL = "/product-slider-management/product-sliders";
+const COMBINE_URL = "/combine-management/combines";
+const PRODUCT_URL = "/product-management/products";
 
 function EditProduct() {
    const [productData, setProductData] = useState<Product>();
@@ -29,73 +40,232 @@ function EditProduct() {
    const [storages, setStorages] = useState<ProductStorage[]>([]);
    const [colors, setColors] = useState<ProductColor[]>([]);
    const [isOpenModal, setIsOpenModal] = useState(false);
+   const addItemModalTarget = useRef<ModelTarget | "">("");
 
    const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
 
    const ranUseEffect = useRef(false);
    const ProductConfigRef = useRef<ConfigRef>(null);
-
-   const stockStorages = useRef<(ProductStorage & { id: number })[]>([]);
-   const stockColors = useRef<(ProductColor & { id: number })[]>([]);
-
-   const storageRef = useRef<HTMLInputElement>(null);
-   const colorRef = useRef<HTMLInputElement>(null);
+   const curColorIndex = useRef<number | undefined>();
+   const curStorageIndex = useRef<number | undefined>();
 
    // use hook
    const { id } = useParams();
    const { setSuccessToast, setErrorToast } = useToast();
    const privateRequest = usePrivateRequest();
+   const { addColor, addStorage, apiLoading, deleteColor, deleteStorage } = useVariantAction({
+      colors,
+      setColors,
+      setStorages,
+      setIsOpenModal,
+      storages,
+   });
 
-   const handleAddVariant = (target: "color" | "storage", value: string | undefined) => {
-      if (!value) return;
-      switch (target) {
-         case "color":
-            const newColor = initColorsData(value, productData!.product_name_ascii, colors.length === 0);
-            setColors((prev) => [...prev, newColor]);
-            return (colorRef.current!.value = "");
-         case "storage":
-            const newStorage = initStorageData(value, productData!.product_name_ascii, storages.length === 0);
-            setStorages((prev) => [...prev, newStorage]);
-            return (storageRef.current!.value = "");
+   const handleOpenModal = (type: typeof addItemModalTarget.current, curIndex?: number) => {
+      addItemModalTarget.current = type;
+      switch (type) {
+         case "add-color":
+         case "edit-color":
+         case "delete-color":
+            curColorIndex.current = curIndex;
+            break;
+
+         case "add-storage":
+         case "edit-storage":
+         case "delete-storage":
+            curStorageIndex.current = curIndex;
+            break;
       }
+      setIsOpenModal(true);
    };
 
-   const handleRemoveVariant = (target: "color" | "storage", index: number) => {
-      switch (target) {
-         case "color":
-            const newColors = [...colors];
-            newColors.splice(index, 1);
-            return setColors(newColors);
-         case "storage":
-            const newStorages = [...storages];
-            return setStorages(newStorages);
-      }
+   const handleAddColor = async (type: "Add" | "Edit", value: string, id?: number) => {
+      const newColor = initColorObject({
+         color: value,
+         color_ascii: generateId(value),
+         product_name_ascii: productData?.product_name_ascii,
+      });
+
+      await addColor(newColor, type, curColorIndex.current, id);
    };
 
-   const initProductData = (type: "color" | "storage", storagesData: ProductStorage[], colorsData: ProductColor[]) => {
+   const handleAddStorage = async (type: "Add" | "Edit", value: string, id?: number) => {
+      const newStorage = initStorageObject({
+         storage: value,
+         storage_ascii: generateId(value),
+         product_name_ascii: productData?.product_name_ascii,
+      });
+
+      await addStorage(newStorage, type, curStorageIndex.current, id);
+   };
+
+   const handleDeleteColor = async () => {
+      await deleteColor(curColorIndex.current);
+   };
+
+   const handleDeleteStorage = async () => {
+      await deleteStorage(curStorageIndex.current);
+   };
+
+   const initStockProductData = (
+      type: "color" | "storage",
+      storagesData: ProductStorage[],
+      colorsData: ProductColor[]
+   ) => {
       switch (type) {
          case "storage":
             setStorages(storagesData);
-            stockStorages.current = storagesData as (ProductStorage & { id: number })[];
             break;
          case "color":
             setColors(colorsData);
-            stockColors.current = colorsData as (ProductColor & { id: number })[];
       }
    };
 
-   const addProductSlider = (
-      newSliders: { id: number; color_ascii: string }[],
-      newColors: (ProductColor & { id: number })[]
-   ) => {
-      const data = newSliders.map((slider) => {
-         const colorItem = newColors.find((color) => color.color_ascii === slider.color_ascii);
-         if (colorItem?.id && slider) {
-            return initProductSlider(slider.id, colorItem?.id, productData!.product_name_ascii);
-         }
-      });
+   // const submitStorage = async (newStorages: ProductStorage[], removeStorages: ProductStorage[]) => {
+   //    const removedStoragesAscii: string[] = [];
+   //    let storagesRes: ProductStorage[] = [];
 
-      return data || [];
+   //    if (removeStorages.length) {
+   //       for await (const item of removeStorages) {
+   //          removedStoragesAscii.push(item.storage_ascii);
+   //          await privateRequest.delete(`${STORAGE_URL}/${item.id}`);
+   //       }
+   //    }
+
+   //    if (newStorages.length) {
+   //       const res = await privateRequest.post(STORAGE_URL, newStorages, {
+   //          headers: { "Content-Type": "application/json" },
+   //       });
+   //       storagesRes = res.data;
+   //    }
+
+   //    return { removedStoragesAscii, storagesRes };
+   // };
+   const submitSlider = async () => {
+      // >>> tracking and submit slider and slider images
+      const newSlidersSchema = await ProductConfigRef.current!.submitSliders();
+
+      if (colors.length) {
+         // >>> api add new products sliders
+         if (newSlidersSchema.length) {
+            const data = initProductSlidersForInsert(
+               newSlidersSchema,
+               colors,
+               productData?.product_name_ascii as string
+            );
+            if (!data.length) {
+               throw new Error("product slider error");
+            }
+            await privateRequest.post(PRODUCT_SLIDER_URL, data, {
+               headers: { "Content-Type": "application/json" },
+            });
+         }
+      }
+   };
+
+   const submitCombines = async (newCombines: ProductCombine[], updateCombines: ProductCombine[]) => {
+      let newCombinesRes: ProductCombine[] = [];
+
+      if (newCombines.length) {
+         const storageIdObject: Record<string, number> = {};
+         storages.forEach((item) => {
+            storageIdObject[item.storage_ascii] = item.id as number;
+         });
+
+         const colorIdObject: Record<string, number> = {};
+         [...colors].forEach((item) => (colorIdObject[item.color_ascii] = item.id as number));
+
+         const combinesSchema = initCombinesForInsert(newCombines, colorIdObject, storageIdObject);
+
+         const res = await privateRequest.post(COMBINE_URL, combinesSchema, {
+            headers: { "Content-Type": "application/json" },
+         });
+         const data = res.data as ProductCombine[];
+
+         newCombinesRes = data;
+      }
+
+      if (updateCombines.length) {
+         const combinesSchema = updateCombines.map((cb) => {
+            let combineSchema: ProductCombineSchema & { id: number };
+            const { color_data, storage_data, ...schema } = cb;
+            combineSchema = schema as ProductCombineSchema & { id: number };
+            return combineSchema;
+         });
+
+         // >>> api update combine
+         for await (const item of combinesSchema) {
+            await privateRequest.put(`${COMBINE_URL}/${item.id}`, item, {
+               headers: { "Content-Type": "application/json" },
+            });
+         }
+      }
+
+      return newCombinesRes;
+   };
+
+   const updateStorageBasePrice = async (mergedCombines: ProductCombine[]) => {
+      let minCB: ProductCombine | undefined;
+      let prevDefaultCb: ProductCombine | undefined;
+      let minPriceOfProduct = MAX_VAL;
+
+      for await (const storageItem of storages) {
+         // loop not removed storage items
+         if (storageItem.id === undefined) {
+            console.log("no found storage id");
+            break;
+         }
+
+         const { cb, minPrice, defaultCB } = findMinCombineOfStorage(storageItem, mergedCombines);
+
+         console.log("check minPrice", minPrice, ",min cb", cb?.id, "default", defaultCB?.id);
+
+         if (defaultCB) prevDefaultCb = defaultCB;
+         if (minPriceOfProduct > minPrice) {
+            minPriceOfProduct = minPrice;
+            minCB = cb;
+         }
+
+         // when init, record.base_price = 0
+         if (!storageItem.base_price || storageItem.base_price !== minPrice) {
+            // assign base price
+            storageItem.base_price = minPrice;
+            // >>> api update storage
+            await privateRequest.put(`${STORAGE_URL}/${storageItem.id}`, storageItem, {
+               headers: { "Content-Type": "application/json" },
+            });
+         }
+      }
+
+      return { minCB, prevDefaultCb };
+   };
+
+   const updateDefaultCombine = async (minCB: ProductCombine, prevDefaultCb: ProductCombine | undefined) => {
+      const updateNewDefaultCB = async () => {
+         privateRequest.put(
+            `${COMBINE_URL}/${minCB!.id}`,
+            { default: true },
+            {
+               headers: { "Content-Type": "application/json" },
+            }
+         );
+      };
+
+      if (!productData?.combines_data.length) {
+         await updateNewDefaultCB();
+      } else {
+         if (!prevDefaultCb || !prevDefaultCb?.id) throw new Error("Update default error");
+
+         if (prevDefaultCb.id !== minCB.id) {
+            await privateRequest.put(
+               `${COMBINE_URL}/${prevDefaultCb.id}`,
+               { default: false },
+               { headers: { "Content-Type": "application/json" } }
+            );
+
+            await updateNewDefaultCB();
+         }
+      }
    };
 
    const handleSubmit = async () => {
@@ -104,93 +274,33 @@ function EditProduct() {
 
          ProductConfigRef.current?.validate();
 
-         const { newStorages, removedStorageIds } = trackingStorages(stockStorages.current, storages);
-         const { newColors, removedColorIds } = trackingColors(stockColors.current, colors);
+         // const { newStorages, removedStorages } = trackingStorages(stockStorages.current, storages);
+         // const { newColors, removedColorIds } = trackingColors(stockColors.current, colors);
 
-         // >>> storage
-         console.log("tracking storage new =", newStorages, "remove =", removedStorageIds);
+         // >>> submit storage
+         // const { storagesRes, removedStoragesAscii } = await submitStorage();
+         // >>> submit color and slider
+         await submitSlider();
 
-         let newStoragesData: ProductStorage[] = [];
+         const { newCombines, updateCombines } = ProductConfigRef.current!.trackingCombine();
 
-         // return;
-         if (newStorages.length) {
-            const res = await privateRequest.post(STORAGE_URL, newStorages, {
-               headers: { "Content-Type": "application/json" },
+         // >>> submit combine
+         const newCombinesRes = await submitCombines(newCombines, updateCombines);
+
+         const isUpdateOrAddNewCombine = !!newCombines.length || !!updateCombines.length;
+         if (isUpdateOrAddNewCombine) {
+            const combinesObject: Record<number, ProductCombine> = {};
+            [...productData.combines_data, ...newCombinesRes, ...updateCombines].map((cb) => {
+               if (!cb.id) return;
+               combinesObject[cb.id] = cb;
             });
-            newStoragesData = res.data as ProductStorage[];
-         }
+            const mergedCombines = Object.entries(combinesObject).map(([_key, cb]) => cb);
+            // >>> submit update storage base_price
+            const { minCB, prevDefaultCb } = await updateStorageBasePrice(mergedCombines);
 
-         if (removedStorageIds.length) {
-            await privateRequest.post(STORAGE_URL + "/delete", removedStorageIds, {
-               headers: { "Content-Type": "application/json" },
-            });
-         }
-
-         const newSliders = await ProductConfigRef.current!.submitSliders();
-         // >>> color
-         console.log("tracking new slider", newSliders);
-         console.log("tracking color new =", newColors, "remove =", removedColorIds);
-
-         let newColorsData: (ProductColor & { id: number })[] = [];
-
-         if (newColors.length) {
-            console.log(">>> submit color");
-            const res = await privateRequest.post(COLOR_URL, newColors, {
-               headers: { "Content-Type": "application/json" },
-            });
-            newColorsData = res.data as (ProductColor & { id: number })[];
-
-            if (newSliders.length) {
-               const newProductSliders = addProductSlider(newSliders, newColorsData);
-
-               console.log(">>> submit product slider check", newProductSliders);
-               if (!newProductSliders.length) {
-                  throw new Error("product slider error");
-               }
-               await privateRequest.post(PRODUCT_SLIDER_URL, newProductSliders, {
-                  headers: { "Content-Type": "application/json" },
-               });
-            }
-         }
-         if (removedColorIds.length) {
-            await privateRequest.post(COLOR_URL + "/delete", removedColorIds, {
-               headers: { "Content-Type": "application/json" },
-            });
-         }
-
-         const newCombines = await ProductConfigRef.current!.submitCombines();
-         // const canSubmitCombine = () => {
-         //    const clLength = newColorsData.length;
-         //    const srLength = newStoragesData.length;
-         //    if (newCombines.length && clLength && newCombines.length == srLength * clLength) return true;
-         //    else return false;
-         // };
-
-         // >>> merge
-         const storageIdObject: Record<string, number> = {};
-         [...storages, ...newStoragesData].forEach((item) => (storageIdObject[item.storage_ascii] = item.id as number));
-         const colorIdObject: Record<string, number> = {};
-         [...colors, ...newColorsData].forEach((item) => (colorIdObject[item.color_ascii] = item.id as number));
-
-         console.log("check storage id object", storageIdObject);
-         console.log("check color id object", colorIdObject);
-
-         if (newCombines.length) {
-            const newCombinesWithId = newCombines.map((cb) => {
-               // const color = newColorsData.find((cl) => cl.color_ascii == cb.color_ascii);
-               // const storage = newStoragesData.find((sr) => sr.storage_ascii == cb.storage_ascii);
-               return {
-                  ...cb,
-                  color_id: colorIdObject[cb.color_ascii as keyof typeof colorIdObject],
-                  storage_id: storageIdObject[cb.storage_ascii as keyof typeof storageIdObject],
-               };
-            });
-
-            console.log(">>> submit combine check", newCombinesWithId);
-
-            await privateRequest.post(COMBINE_URL, newCombinesWithId, {
-               headers: { "Content-Type": "application/json" },
-            });
+            if (!minCB) throw new Error("Min cb error");
+            // >>> submit update default combine
+            await updateDefaultCombine(minCB, prevDefaultCb);
          }
 
          setSuccessToast("Edit product successful");
@@ -200,22 +310,97 @@ function EditProduct() {
       }
    };
 
+   const renderModal = useMemo(() => {
+      if (!isOpenModal) return;
+
+      switch (addItemModalTarget.current) {
+         case "add-color":
+            return (
+               <AddItem
+                  loading={apiLoading}
+                  title={"Add color"}
+                  cbWhenSubmit={(value) => handleAddColor("Add", value)}
+                  setIsOpenModal={setIsOpenModal}
+               />
+            );
+         case "edit-color":
+            if (curColorIndex.current !== undefined) {
+               const currentColor = colors[curColorIndex.current];
+               return (
+                  <AddItem
+                     loading={apiLoading}
+                     title={"Edit color"}
+                     cbWhenSubmit={(value) => handleAddColor("Edit", value, currentColor.id)}
+                     setIsOpenModal={setIsOpenModal}
+                     initValue={currentColor.color}
+                  />
+               );
+            }
+            return <h1 className="text-2xl">Cur index not found</h1>;
+         case "add-storage":
+            return (
+               <AddItem
+                  loading={apiLoading}
+                  title={"Add storage"}
+                  cbWhenSubmit={(value) => handleAddStorage("Add", value)}
+                  setIsOpenModal={setIsOpenModal}
+               />
+            );
+         case "edit-storage":
+            if (curStorageIndex.current !== undefined) {
+               const curStorage = storages[curStorageIndex.current];
+               return (
+                  <AddItem
+                     loading={apiLoading}
+                     title={"Edit storage"}
+                     cbWhenSubmit={(value) => handleAddStorage("Edit", value, curStorage.id)}
+                     setIsOpenModal={setIsOpenModal}
+                     initValue={curStorage.storage}
+                  />
+               );
+            }
+            break;
+         case "delete-color":
+            if (curColorIndex.current === undefined) return <h1 className="text-2xl">Cur index not found</h1>;
+            return (
+               <ConfirmModal
+                  label={`Delete color '${colors[curColorIndex.current].color} ?'`}
+                  loading={apiLoading}
+                  callback={handleDeleteColor}
+                  setOpenModal={setIsOpenModal}
+               />
+            );
+         case "delete-storage":
+            if (curStorageIndex.current === undefined) return <h1 className="text-2xl">Cur index not found</h1>;
+            return (
+               <ConfirmModal
+                  label={`Delete storage '${storages[curStorageIndex.current].storage} ?'`}
+                  loading={apiLoading}
+                  callback={handleDeleteStorage}
+                  setOpenModal={setIsOpenModal}
+               />
+            );
+      }
+   }, [isOpenModal, apiLoading]);
+
    useEffect(() => {
       const getProductDetail = async () => {
          try {
             if (!id) throw new Error("missing params");
-            const res = await privateRequest.get(`/product-management/dien-thoai/${id}`);
+            if (import.meta.env.DEV) await sleep(300);
+
+            const res = await privateRequest.get(`${PRODUCT_URL}/${id}`);
             const data = res.data as Product;
 
             setProductData(data);
-            const storagesData = data.storages_data;
-            const colorsData = data.colors_data;
+            const storagesData = data.storages_data as ProductStorage[];
+            const colorsData = data.colors_data as ProductColor[];
             if (storagesData.length) {
-               initProductData("storage", storagesData, []);
+               initStockProductData("storage", storagesData, []);
             }
 
             if (colorsData.length) {
-               initProductData("color", [], colorsData);
+               initStockProductData("color", [], colorsData);
             }
 
             if (import.meta.env.DEV) {
@@ -234,13 +419,14 @@ function EditProduct() {
       }
    }, []);
 
+   if (status === "loading") return <i className="material-icons animate-spin">sync</i>;
    if ((!productData && status === "success") || status === "error") return <h1>Some thing went wrong</h1>;
 
    return (
       <>
-         <div className="">
-            <h1 className="text-[30px] font-[900] mb-[30px]">{productData?.product_name}</h1>
+         <h1 className="text-[30px] font-[900] mb-[30px]">{productData?.product_name}</h1>
 
+         <div className="pb-[30px]">
             <div className="row mb-[30px]">
                <div className="col col-6 ">
                   <h5 className={cx("label")}>Storage</h5>
@@ -249,27 +435,22 @@ function EditProduct() {
                         storages.map((item, index) => {
                            return (
                               <div key={index} className="col col-3">
-                                 <Empty onClick={() => handleRemoveVariant("storage", index)}>{item.storage}</Empty>
-                                 {item.default && <span>default</span>}
+                                 <Empty className="group">
+                                    <span className="text-center font-semibold text-[16px]">{item.storage}</span>
+                                    <OverlayCTA
+                                       data={[
+                                          { cb: () => handleOpenModal("edit-storage", index), icon: "edit" },
+                                          { cb: () => handleOpenModal("delete-storage", index), icon: "delete" },
+                                       ]}
+                                    />
+                                 </Empty>
                               </div>
                            );
                         })}
                      <div className="col col-3">
-                        <Empty onClick={() => setIsOpenModal(true)} />
+                        <Empty onClick={() => handleOpenModal("add-storage")} />
                      </div>
                   </div>
-
-                  {/* <div className="row mt-15">
-                        <input ref={storageRef} placeholder="64GB..." type="text" />
-                        <Button
-                           onClick={() => handleAddVariant("storage", storageRef.current?.value)}
-                           className="mt-15"
-                           fill
-                           rounded
-                        >
-                           Add
-                        </Button>
-                     </div> */}
                </div>
                <div className="col col-6">
                   <h5 className={cx("label")}>Color</h5>
@@ -277,26 +458,21 @@ function EditProduct() {
                      {!!colors.length &&
                         colors.map((item, index) => (
                            <div key={index} className="col col-3">
-                              <Empty onClick={() => handleRemoveVariant("color", index)}>{item.color}</Empty>
-                              {item.default && <span>default</span>}
+                              <Empty>
+                                 <span className="font-semibold text-[16px]">{item.color}</span>
+                                 <OverlayCTA
+                                    data={[
+                                       { cb: () => handleOpenModal("edit-color", index), icon: "edit" },
+                                       { cb: () => handleOpenModal("delete-color", index), icon: "delete" },
+                                    ]}
+                                 />
+                              </Empty>
                            </div>
                         ))}
                      <div className="col col-3">
-                        <Empty onClick={() => colorRef.current?.focus()} />
+                        <Empty onClick={() => handleOpenModal("add-color")} />
                      </div>
                   </div>
-
-                  {/* <div className="row mt-15">
-                        <input ref={colorRef} placeholder="Black..." type="text" />
-                        <Button
-                           onClick={() => handleAddVariant("color", colorRef.current?.value)}
-                           className="mt-15"
-                           fill
-                           rounded
-                        >
-                           Add
-                        </Button>
-                     </div> */}
                </div>
             </div>
 
@@ -311,16 +487,14 @@ function EditProduct() {
                </ProductDataProvider>
             )}
 
-            <Button onClick={handleSubmit} fill rounded className={cx("mt-15")}>
-               Create
-            </Button>
+            <p className="text-center">
+               <Button onClick={handleSubmit} primary className={cx("mt-15")}>
+                  <i className="material-icons">save</i> Save
+               </Button>
+            </p>
          </div>
 
-         {isOpenModal && (
-            <Modal setShowModal={setIsOpenModal}>
-               <AddItem cb={(value) => handleAddVariant("color", value)} setIsOpenModal={setIsOpenModal} />
-            </Modal>
-         )}
+         {isOpenModal && <Modal setShowModal={setIsOpenModal}>{renderModal}</Modal>}
       </>
    );
 }

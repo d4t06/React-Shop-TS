@@ -13,7 +13,8 @@ import { Brand } from "@/types";
 import { publicRequest } from "@/utils/request";
 import { useApp } from "@/store/AppContext";
 import { sleep } from "@/utils/appHelper";
-import Skeleton from "@/components/Skeleton";
+import useAppConfig from "@/hooks/useAppConfig";
+// import Skeleton from "@/components/Skeleton";
 
 const cx = classNames.bind(styles);
 
@@ -23,23 +24,30 @@ export default function Product() {
       status,
       page,
       productState: { count, products },
+      category_id,
    } = useSelector(selectedAllProduct);
    const { filters, sort } = useSelector(selectedAllFilter);
-   const { brands, setBrands } = useApp();
+   const { brands, categories } = useApp();
 
-   const [apiLoading, setApiLoading] = useState(true);
+   const [apiLoading, setApiLoading] = useState(false);
 
    // ref
    const firstTimeRender = useRef(true);
    const prevCat = useRef("");
 
    // use hooks
-   const { category = "dien-thoai" } = useParams<{ category: string }>();
-   const remaining = useMemo(() => count - products.length, [products]);
+   const { category_ascii } = useParams<{ category_ascii: string }>();
+   const remaining = useMemo(() => count - products.length, [products, category_ascii]);
+
+   const curCategory = useMemo(
+      () => categories.find((c) => c.category_ascii === category_ascii),
+      [category_ascii, categories]
+   );
+   const { status: configStatus } = useAppConfig({ curCategory });
 
    const handleGetMore = () => {
-      if (!category) return;
-      dispatchRedux(getMoreProducts({ category, sort, filters, page: page + 1 }));
+      if (!category_id) return;
+      dispatchRedux(getMoreProducts({ category_id, sort, filters, page: page + 1 }));
    };
 
    const renderProducts = () => {
@@ -62,41 +70,21 @@ export default function Product() {
    };
 
    useEffect(() => {
-      if (!category) return;
+      if (!category_ascii || !curCategory) return;
 
-      if (firstTimeRender.current || prevCat.current !== category) {
-         dispatchRedux(fetchProducts({ category, filters, page: 1, sort }));
-      }
-
-      const getBrands = async () => {
-         try {
-            setApiLoading(true);
-            if (!brands[category]) {
-               const brandsRes = await publicRequest.get("app/brand" + "?category=" + category);
-               const brandsData = brandsRes.data as Brand[];
-
-               const newBrands = { ...brands };
-               newBrands[category] = brandsData;
-               setBrands(newBrands);
-            } else {
-               await sleep(300);
-            }
-         } catch (error) {
-            console.log({ message: error });
-         } finally {
-            setApiLoading(false);
-         }
-      };
-
-      if (category) {
-         getBrands();
+      if (firstTimeRender.current || prevCat.current !== category_ascii) {
+         dispatchRedux(fetchProducts({ category_id: curCategory?.id, filters, page: 1, sort }));
       }
 
       return () => {
          firstTimeRender.current = false;
-         prevCat.current = category || "";
+         prevCat.current = category_ascii || "";
       };
-   }, [category]);
+   }, [categories, category_ascii]);
+
+   console.log("check status", count, remaining);
+
+   if (!curCategory || !curCategory.id) return <h1>Category not found</h1>;
 
    return (
       <div className={cx("product-container")}>
@@ -104,26 +92,24 @@ export default function Product() {
 
          <div className={cx("product-body", "row")}>
             <div className="col col-9">
-               <Label category={category} count={count} loading={status === "loading"} />
-               <QuickFilter loading={apiLoading} brands={brands[category]} category={category} />
-               <Sort loading={status === "loading"} category={category} />
+               <Label categoryName={curCategory?.category_name} count={count} loading={status === "loading"} />
+               <QuickFilter
+                  loading={apiLoading || configStatus === "loading"}
+                  brands={brands[curCategory.category_ascii]}
+                  curCategory={curCategory}
+               />
+               <Sort loading={status === "loading"} category_id={curCategory.id} />
 
                <div className={cx("product-container")}>
                   <div className="row">
-                     {status !== "loading" && <>{!!products.length ? renderProducts() : <NoProduct />}</>}
                      {(status === "loading" || status === "more-loading") && ProductsSkeletons()}
+                     {status !== "loading" && (
+                        <>{!products.length || status === "error" ? <NoProduct /> : renderProducts()}</>
+                     )}
                   </div>
                   {status !== "loading" && !!products.length && (
                      <div className={cx("pagination", { disable: remaining === 0 })}>
-                        <Button
-                           disable={status === "more-loading"}
-                           outline
-                           rounded
-                           mgauto
-                           count={remaining}
-                           onClick={() => handleGetMore()}
-                           describe="sản phẩm"
-                        >
+                        <Button disable={status === "more-loading"} onClick={() => handleGetMore()}>
                            Xem thêm
                         </Button>
                      </div>
@@ -131,7 +117,7 @@ export default function Product() {
                </div>
             </div>
 
-            {<Filter loading={apiLoading} category={category} />}
+            {<Filter loading={apiLoading || configStatus === "loading"} category={curCategory.category_ascii} />}
          </div>
       </div>
    );

@@ -11,7 +11,7 @@ const NoProduct = () => {
                alt=""
             />
          </div>
-         <h1>Rất tiếc chúng tôi không tìm thấy kết quả theo yêu cầu của bạn</h1>
+         <h1 className='text-3xl mt-[30px]'>Rất tiếc chúng tôi không tìm thấy kết quả theo yêu cầu của bạn</h1>
       </div>
    );
 };

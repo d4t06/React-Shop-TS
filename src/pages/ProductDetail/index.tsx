@@ -16,7 +16,7 @@ function DetailPage() {
          try {
             if (!category || !key) return;
 
-            const data = await productServices.getProductDetail({ category, id: key });
+            const data = await productServices.getProductDetail({ id: key });
             setProduct(data);
             setStatus("finish");
          } catch (error) {

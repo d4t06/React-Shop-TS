@@ -37,7 +37,7 @@ const continents = [
    },
 ];
 
-function ProductSort({ category, loading }: { category: string; loading: boolean }) {
+function ProductSort({ category_id, loading }: { category_id: number; loading: boolean }) {
    const dispatch = useDispatch<AppDispatch>();
    const { filters } = useSelector(selectedAllFilter);
    const [checked, setChecked] = useState(1);
@@ -45,7 +45,7 @@ function ProductSort({ category, loading }: { category: string; loading: boolean
    useEffect(() => {
       if (checked === 1) return;
       setChecked(1);
-   }, [category]);
+   }, [category_id]);
 
    const handleSort = (id: number) => {
       const newSort: SortType = {
@@ -59,7 +59,7 @@ function ProductSort({ category, loading }: { category: string; loading: boolean
          newSort.type = continents[id - 1].type as SortType["type"];
 
          dispatch(storingFilters({ filters, sort: newSort }));
-         dispatch(fetchProducts({ page: 1, category, filters, sort: newSort }));
+         dispatch(fetchProducts({ page: 1, category_id, filters, sort: newSort }));
       }
    };
 
@@ -72,7 +72,7 @@ function ProductSort({ category, loading }: { category: string; loading: boolean
 
    return (
       <div className={cx("product-sort")}>
-         <h1>Xem theo</h1>
+         <h1 className="text-3xl">Xem theo</h1>
          <ul className={cx("btn-group", { disable: loading })}>
             {continents.map((item, index) => {
                return (

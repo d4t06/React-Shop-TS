@@ -5,12 +5,12 @@ import classNames from "classnames/bind";
 import styles from "./Search.module.scss";
 import searchService from "../../services/searchService";
 import useDebounce from "../../hooks/useDebounce";
-import {Popup} from "../";
+import Popup from "../ui/Popup";
 
 import PopupStyles from "../ui/Popup/Popup.module.scss";
 
 const cx = classNames.bind(styles);
-const cy = classNames.bind(PopupStyles);
+// const  = classNames.bind(PopupStyles);
 
 type Props = {
    setShowModal: Dispatch<SetStateAction<boolean>>;
@@ -82,31 +82,31 @@ function Search({ setShowModal }: Props) {
    return (
       <Popup
          content={
-            <div className={cy("wrap")}>
-               <h2 className={cy("search-result-title")}>Sản phẩm được gợi ý</h2>
+            <div className={("wrap")}>
+               <h2 className={("search-result-title")}>Sản phẩm được gợi ý</h2>
                <ul>
                   {searchResult &&
                      searchResult?.products.map((item) => {
                         return (
                            <li
                               onClick={() => handleDetailPage(item)}
-                              className={cy("product-item")}
+                              className={("product-item")}
                               key={item.product_id}
                            >
-                              <div className={cy("product-img")}>
+                              <div className={("product-img")}>
                                  <img src={item.image_url} alt="" />
                               </div>
-                              <div className={cy("product-info")}>
-                                 <h2 className={cy("title")}>{item.name}</h2>
+                              <div className={("product-info")}>
+                                 <h2 className={("title")}>{item.name}</h2>
                                  {item.old_price && (
                                     <>
-                                       <span className={cy("old_price")}>{moneyFormat(item?.old_price)}₫</span>
-                                       <span className={cy("discount-percent")}>
+                                       <span className={("old_price")}>{moneyFormat(item?.old_price)}₫</span>
+                                       <span className={("discount-percent")}>
                                           -{(((+item.old_price - +item.cur_price) / +item.old_price) * 100).toFixed(0)}%
                                        </span>
                                     </>
                                  )}
-                                 <p className={cy("cur_price")}>{moneyFormat(item.cur_price)}₫</p>
+                                 <p className={("cur_price")}>{moneyFormat(item.cur_price)}₫</p>
                               </div>
                            </li>
                         );
@@ -114,7 +114,7 @@ function Search({ setShowModal }: Props) {
                </ul>
             </div>
          }
-         option={{
+         opts={{
             visible: isShowResult,
             appendTo: () => document.body,
             onClickOutside: () => handleShow(false),

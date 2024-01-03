@@ -1,35 +1,43 @@
 import { Param } from "@/store/productsSlice";
 import { publicRequest } from "@/utils/request";
 
-export const getProducts = async (params: Param) => {
-   if (!params) {
+export const getProducts = async (props: Param) => {
+   if (!props) {
       console.log("product service missing query");
       return [];
    }
 
-   const { filters, sort, category, page } = params;
+   const { filters, sort, category_id, page } = props;
    try {
-      const response = await publicRequest.get(`/products/${category}`, {
-         params: {
-            page,
-            // ...filters, //brand='samsung,iphone'
-            brand_name: filters.brand,
-            price: filters.price,
-            ...sort, //column=cur_price&type=asc
-         },
+      if (category_id === undefined) throw new Error("missing category")
+      const params: Record<string, string | string[] | number[] | number> = { page: page, category_id };
+
+      if (filters.brands.length) params["brand_id"] = filters.brands.map((b) => b.id) as number[];
+      if (sort.column && sort.type) {
+         params['column'] = sort.column 
+         params['type'] = sort.type 
+      }
+
+      const response = await publicRequest.get(`/products`, {
+         params,
       });
       return response.data;
    } catch (error) {
-      console.log("loi getProducts services", error);
+      console.log({ message: error });
+      throw new Error("loi getProducts services");
    }
 };
 
 export const getProductsAdmin = async (params: Param) => {
-   const { filters, sort, category, page } = params;
+   const { filters, sort, category_id, page } = params;
+   const brand_id = filters.brands.map((b) => b.id);
+
    try {
-      const response = await publicRequest.get(`/product-management/${category}`, {
+      const response = await publicRequest.get(`/product-management/products`, {
          params: {
             page,
+            category_id,
+            brand_id,
          },
       });
       return response.data;
@@ -38,16 +46,14 @@ export const getProductsAdmin = async (params: Param) => {
    }
 };
 
-export const getProductDetail = async (params: { category: string; id: string }) => {
+export const getProductDetail = async (params: { id: string }) => {
    if (!params) {
       console.log("product service missing query");
       return;
    }
-   const { category, id } = params;
+   const { id } = params;
    try {
-      const response = await publicRequest.get(`/products/${category}/${id}`, {
-         params: {},
-      });
+      const response = await publicRequest.get(`/products/${id}`);
       return response.data;
    } catch (error) {
       console.log("loi getProductDetail services", error);

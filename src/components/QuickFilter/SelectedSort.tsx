@@ -3,48 +3,49 @@ import styles from "./BrandSort.module.scss";
 import { price } from "@/assets/data";
 import { useMemo } from "react";
 import { FilterType } from "@/store/filtersSlice";
+import { Brand } from "@/types";
 
 const cx = classNames.bind(styles);
 
 type Props = {
-   category: string;
-   data: { brand: string[]; price: string[] };
-   handleFilter: (filters: string[], by: keyof FilterType | "clear") => void;
+   // curCategory_id: number;
+   data: FilterType;
+   handleFilter: (filters: Brand[], by: keyof FilterType | "clear") => void;
 };
 
-export default function SelectedSort({ category, data, handleFilter }: Props) {
-   const handleToggle = (value: string) => {
-      let newChecked = [...data.brand];
+export default function SelectedSort({ data, handleFilter }: Props) {
+   const handleToggle = (brand: Brand) => {
+      let newBrands = [...data.brands];
 
-      newChecked = newChecked.filter((brand) => brand !== value);
-      handleFilter(newChecked, "brand");
+      newBrands = newBrands.filter((b) => b.brand_ascii !== brand.brand_ascii);
+      handleFilter(newBrands, "brands");
    };
 
-   const priceList = price[category as keyof typeof price];
+   // const priceList = price[(curCategory_id) as keyof typeof price];
 
-   const priceContent =
-      priceList.length && priceList.find((item) => JSON.stringify(item.array) === JSON.stringify(data.price));
+   // const priceContent = priceList
+   //    ? priceList.find((item) => JSON.stringify(item.array) === JSON.stringify(data.price))
+   //    : {};
 
-   const isShowClear = useMemo(() => (!!data.brand.length && !!data.price.length) || data.brand.length >= 2, [data]);
+   const isShowClear = useMemo(() => data.brands.length >= 2, [data]);
 
    return (
       <>
-         <h2>Bộ lọc:</h2>
-         {data.brand &&
-            data?.brand?.map((item, index) => {
-               return (
-                  <div onClick={() => handleToggle(item)} className={cx("filter-item")} key={index}>
-                     <p>{item}</p>
-                     <i className="material-icons">delete</i>
-                  </div>
-               );
-            })}
-         {priceContent && !!data.price.length && (
+         <h2 className="text-[16px]">Bộ lọc:</h2>
+         {data.brands.map((item, index) => {
+            return (
+               <div onClick={() => handleToggle(item)} className={cx("filter-item")} key={index}>
+                  <p>{item.brand_name}</p>
+                  <i className="material-icons">delete</i>
+               </div>
+            );
+         })}
+         {/* {priceContent && !!data.price.length && (
             <span onClick={() => handleFilter([], "price")} className={cx("filter-item")}>
-               {priceContent.text || ""}
+               {priceContent!.text || ""}
                <i className="material-icons">delete</i>
             </span>
-         )}
+         )} */}
          {isShowClear && (
             <button className={cx("clear-filter")} onClick={() => handleFilter([], "clear")}>
                <i className="material-icons">clear</i>

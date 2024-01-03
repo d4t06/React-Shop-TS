@@ -2,24 +2,22 @@ import classNames from "classnames/bind";
 import styles from "./Modal.module.scss";
 import { Dispatch, ReactNode, SetStateAction } from "react";
 import { createPortal } from "react-dom";
-import { Popup } from "..";
-
 const cx = classNames.bind(styles);
 
 type Props = {
    children: ReactNode;
    setShowModal: Dispatch<SetStateAction<boolean>>;
+   child?:boolean
 };
 
-function Modal({ children, setShowModal }: Props) {
+function Modal({ children, setShowModal, child }: Props) {
    return (
       <>
          {createPortal(
             <>
-               <div className={cx("overlay")} onClick={() => setShowModal(false)}></div>
+               <div className={cx("overlay", {child})} onClick={() => setShowModal(false)}></div>
                {children && (
                   <div className={cx("modal")}>
-                     <Popup>
                      {children}
                   </div>
                )}

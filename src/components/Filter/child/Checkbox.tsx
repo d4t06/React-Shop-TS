@@ -3,6 +3,7 @@ import styles from "../ProductFilter.module.scss";
 import { FilterType } from "@/store/filtersSlice";
 import { useMemo } from "react";
 import { useApp } from "@/store/AppContext";
+import { Brand } from "@/types";
 
 const cx = classNames.bind(styles);
 
@@ -16,8 +17,8 @@ export default function Checkbox({ handleFilter, filters, category }: Props) {
    const { brands } = useApp();
    const brandList = useMemo(() => brands[category], [category]);
 
-   const handleToggle = (value: string) => {
-      let newBrands = [...filters.brand];
+   const handleToggle = (value: Brand) => {
+      let newBrands = [...filters.brands];
 
       if (!value) newBrands = [];
       else {
@@ -35,17 +36,17 @@ export default function Checkbox({ handleFilter, filters, category }: Props) {
    return (
       <>
          {brandList.map((item, index) => {
-            const isChecked =
-               filters.brand.indexOf(item.brand_name_ascii) !== -1 || (!item.brand_name_ascii && !filters.brand.length);
+            const isChecked = false
+               // filters.brands.indexOf(item.brand_ascii) !== -1 || (!item.brand_ascii && !filters.brand.length);
             return (
                <div key={index} className={cx("filter-item")}>
                   <input
-                     id={item.brand_name_ascii}
+                     id={item.brand_ascii}
                      type="checkbox"
                      checked={isChecked}
-                     onChange={() => handleToggle(item.brand_name_ascii)}
+                     onChange={() => handleToggle(item)}
                   />
-                  <label htmlFor={item.brand_name_ascii} className={cx("label")}>
+                  <label htmlFor={item.brand_ascii} className={cx("label")}>
                      {item.brand_name}
                   </label>
                </div>

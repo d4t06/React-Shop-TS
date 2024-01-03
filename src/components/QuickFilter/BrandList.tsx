@@ -11,16 +11,20 @@ const cx = classNames.bind(styles);
 
 type Props = {
    data: Brand[];
-   handleFilter: (filters: string[], by: keyof FilterType | "clear") => void;
+   filtersInStore?: FilterType;
    admin?: boolean;
+   handleFilter: (filters: Brand[], by: keyof FilterType | "clear") => void;
 };
 
-function BrandList({ data, handleFilter, admin }: Props) {
-   const [checked, setChecked] = useState("");
+function BrandList({ data, handleFilter, filtersInStore, admin }: Props) {
+   const handleToggle = (brand: Brand) => {
+      if (admin) {
+         // *** filterInStore will pass with admin
+         const newBrands = [...filtersInStore!.brands, brand];
+         return handleFilter(newBrands, "brands");
+      }
 
-   const handleToggle = (brand: string) => {
-      setChecked(brand);
-      handleFilter([brand], "brand");
+      return handleFilter([brand], "brands");
    };
 
    if (!data) return;
@@ -28,28 +32,13 @@ function BrandList({ data, handleFilter, admin }: Props) {
    return (
       <>
          {data.map((item, index) => {
-            if (!item.image_url) return;
-
-            if (admin)
-               return (
-                  <div key={index}>
-                     <p className={cx("brand-name")}>( {item.brand_name} )</p>
-                     <div
-                        key={index}
-                        className={cx("sort-item", { active: checked === item.brand_name_ascii })}
-                        onClick={() => handleToggle(item.brand_name_ascii)}
-                     >
-                        <img src={item.image_url} alt="" />
-                     </div>
-                  </div>
-               );
             return (
                <div
                   key={index}
-                  className={cx("sort-item", { active: checked === item.brand_name_ascii })}
-                  onClick={() => handleToggle(item.brand_name_ascii)}
+                  className={cx("sort-item", { "no-image": !item.image_url })}
+                  onClick={() => handleToggle(item)}
                >
-                  <img src={item.image_url} alt="" />
+                  {item.image_url ? <img src={item.image_url} alt="" /> : <p className="text-[18px]">{item.brand_name}</p>}
                </div>
             );
          })}

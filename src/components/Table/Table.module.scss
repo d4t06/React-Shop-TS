@@ -3,9 +3,15 @@
    width: 100%;
    border-collapse: collapse;
    border: 1px solid #ccc;
-   overflow: hidden;
+   background-color: #fff;
    tr {
       border-bottom: 1px solid #ccc;
+      &:last-child {
+         border-radius: 0 0 8px 8px;
+      }
+      &:nth-child(even) {
+         // background-color: #e1e1e1/;
+      }
    }
    th,
    td {
@@ -15,8 +21,9 @@
       font-weight: bolder;
    }
    th {
-      background-color: #e1e1e1;
+      background-color: #ccc;
       text-transform: uppercase;
+      font-size: 1.4rem;
    }
    .product-image {
       width: 90px;

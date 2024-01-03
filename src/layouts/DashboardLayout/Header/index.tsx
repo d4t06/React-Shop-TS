@@ -17,7 +17,7 @@ function Header({ less }: { less?: boolean }) {
    return (
       <div className={cx("header__wrapper")}>
          <div className={cx("header")}>
-            <h2>Hello {decode ? decode.username : "no persist"} !</h2>
+            <h1 className="text-3xl">Hello {decode ? decode.username : "no persist"} !</h1>
          </div>
       </div>
    );

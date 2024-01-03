@@ -1,34 +1,59 @@
-import { useRef, useState } from "react";
+import { Dispatch, SetStateAction, useMemo, useRef, useState } from "react";
 
-import { generateId, initProductObject, initStorageObject } from "@/utils/appHelper";
+import { generateId, initProductObject } from "@/utils/appHelper";
 import { Button, Gallery, Modal } from "@/components";
-import usePrivateRequest from "@/hooks/usePrivateRequest";
 
-import { ProductSchema } from "@/types";
+import { Category, Product, ProductSchema } from "@/types";
 import { Empty, Input } from "@/components";
-import useAppConfig from "@/hooks/useAppConfig";
 import { inputClasses } from "@/components/ui/Input";
-import { useToast } from "@/store/ToastContext";
+import ModalHeader from "./ModalHeader";
 import useProductAction from "@/hooks/useProductAction";
+import { useApp } from "@/store/AppContext";
+import useAppConfig from "@/hooks/useAppConfig";
+import { useToast } from "@/store/ToastContext";
 
-function AddProduct() {
-   const [productData, setProductData] = useState<ProductSchema>(initProductObject({}));
+type OpenType = "Edit" | "Add";
+
+type Props = {
+   setIsOpenModalParent: Dispatch<SetStateAction<boolean>>;
+   openType: OpenType;
+   curProduct?: Product & { curIndex: number };
+   curCategory?: Category;
+};
+
+export default function AddProductModal({ curProduct, openType, setIsOpenModalParent, curCategory }: Props) {
+   const [productData, setProductData] = useState<ProductSchema>(
+      curProduct || initProductObject({ category_id: curCategory?.id })
+   );
    const [isOpenModal, setIsOpenModal] = useState(false);
-   const [loading, setLoading] = useState(false);
+   const [selectedCat, setSelectedCat] = useState(curCategory);
 
    const nameRef = useRef<HTMLInputElement>(null);
    // use hook
-   const {addProduct, apiLoading} = useProductAction({})
-   // const privateRequest = usePrivateRequest();
-   // const { setErrorToast, setSuccessToast } = useToast();
-   const { brands, categories, status } = useAppConfig({ curCat: productData.category_id });
+   const { addProduct, apiLoading } = useProductAction({ setIsOpenModal: setIsOpenModalParent });
+   const { brands, categories, } = useApp();
+   const { status: appStatus } = useAppConfig({ curCategory: selectedCat });
+   const { setErrorToast } = useToast();
+
+   const brandsByCategory = useMemo(() => {
+      if (appStatus === "loading" || !brands || !selectedCat) return [];
+
+      return brands[selectedCat.category_ascii] || [];
+   }, [selectedCat, brands]);
 
    const handleInput = (field: keyof typeof productData, value: any) => {
       // also set product_name_ascii
       if (field === "product_name") {
-         setProductData({ ...productData, [field]: value, product_name_ascii: generateId(value) });
-         return;
+         return setProductData({ ...productData, [field]: value, product_name_ascii: generateId(value) });
       }
+
+      if (field === "category_id") {
+         if (!value) return;
+         const category = categories.find((c) => c.id === value);
+         if (!category) return setErrorToast("No category found");
+         setSelectedCat(category);
+      }
+
       setProductData({ ...productData, [field]: value });
    };
 
@@ -37,50 +62,34 @@ function AddProduct() {
    };
 
    const handleSubmit = async () => {
-      await addProduct("Add", productData)
-      // try {
-      //    setLoading(true);
-      //    const controller = new AbortController();
-      //    await privateRequest.post("/product-management", productData, {
-      //       headers: { "Content-Type": "application/json" },
-      //       signal: controller.signal,
-      //    });
+      console.log("check product data", productData);
 
-      //    const defaultStorage = initStorageObject({
-      //       storage: "default",
-      //       storage_ascii: "default",
-      //       base_price: 0,
-      //       default: true,
-      //       product_name_ascii: productData.product_name_ascii,
-      //    });
-
-      //    await privateRequest.post("/storage-management", defaultStorage, {
-      //       headers: { "Content-Type": "application/json" },
-      //       signal: controller.signal,
-      //    });
-
-      //    setSuccessToast("Add product successful");
-
-      //    return () => {
-      //       controller.abort();
-      //    };
-      // } catch (error) {
-      //    console.log({ message: error });
-      //    setErrorToast("Add product fail");
-      // } finally {
-      //    setLoading(false);
-      // }
+      switch (openType) {
+         case "Add":
+            await addProduct("Add", productData);
+            break;
+         case "Edit":
+            await addProduct("Edit", productData);
+            break;
+         default:
+            console.log("click");
+      }
    };
 
-   if (status === "error") return <h1>Some thing went wrong</h1>;
+   if (appStatus === "error") return <h1>Some thing went wrong</h1>;
+
+   const tileMap: Record<OpenType, string> = {
+      Add: "Add new product",
+      Edit: `Edit product '${curProduct?.product_name}'`,
+   };
 
    return (
-      <>
-         <div className={status === "loading" || loading ? "opacity-60 pointer-events-none" : ""}>
-            {/* <h1 className="text-3xl font-semibold mb-[30px] text-center uppercase">Add Product</h1> */}
+      <div className="w-[700px] max-w-[90vw]">
+         <ModalHeader setIsOpenModal={setIsOpenModalParent} title={`${tileMap[openType]}`} />
+         <div className={appStatus === "loading" || apiLoading ? "opacity-60 pointer-events-none" : ""}>
             <div className="row mb-[30px]">
                <div className="col col-4">
-                  <div className="bg-white p-[20px] rounded-[8px]">
+                  <div className="">
                      {!productData.image_url && (
                         <Empty onClick={() => setIsOpenModal(true)}>
                            <i className="material-icons">add</i>
@@ -97,7 +106,7 @@ function AddProduct() {
                   </div>
                </div>
                <div className="col col-8">
-                  <div className="bg-white h-full p-[20px] rounded-[8px]">
+                  <div className="">
                      <div className="flex flex-col">
                         <label className={"text-[18px] mb-[4px]"} htmlFor="">
                            Tên sản phẩm
@@ -118,7 +127,7 @@ function AddProduct() {
                         <select
                            name="category"
                            value={productData.category_id}
-                           onChange={(e) => handleInput("category_id", e.target.value)}
+                           onChange={(e) => handleInput("category_id", +e.target.value)}
                            className={inputClasses.input}
                         >
                            <option value="">- - -</option>
@@ -138,16 +147,15 @@ function AddProduct() {
                         <select
                            name="brand"
                            value={productData.brand_id}
-                           onChange={(e) => handleInput("brand_id", e.target.value)}
+                           onChange={(e) => handleInput("brand_id", +e.target.value)}
                            className={inputClasses.input}
                         >
                            <option value="">- - -</option>
-                           {!!brands.length &&
-                              brands.map((brand, index) => (
-                                 <option key={index} value={brand.id}>
-                                    {brand.brand_name}
-                                 </option>
-                              ))}
+                           {brandsByCategory.map((brand, index) => (
+                              <option key={index} value={brand.id}>
+                                 {brand.brand_name}
+                              </option>
+                           ))}
                         </select>
                      </div>
                   </div>
@@ -155,7 +163,7 @@ function AddProduct() {
             </div>
 
             <p className="text-center">
-               <Button className="font-[600]" onClick={handleSubmit} primary>
+               <Button isLoading={apiLoading} className="font-[600]" onClick={handleSubmit} primary>
                   <i className="material-icons mr-[6px]">save</i> Save
                </Button>
             </p>
@@ -166,8 +174,6 @@ function AddProduct() {
                <Gallery setIsOpenModal={setIsOpenModal} setImageUrl={handleChoseProductImage} />
             </Modal>
          )}
-      </>
+      </div>
    );
 }
-
-export default AddProduct;

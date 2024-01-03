@@ -1,8 +1,9 @@
+import { Brand } from "@/types";
 import { createSlice } from "@reduxjs/toolkit";
 
 export type FilterType = {
-   brand: string[];
-   price: string[];
+   brands: Brand[];
+   // price: string[];
 };
 
 export type SortType = {
@@ -17,8 +18,8 @@ type StateType = {
 
 const initialState: StateType = {
    filters: {
-      brand: [],
-      price: [],
+      brands: [],
+      // price: [],
    },
    sort: {
       column: "",
@@ -30,12 +31,12 @@ const filtersSlice = createSlice({
    name: "filters",
    initialState,
    reducers: {
-      storingFilters(state, action) {
+      storingFilters(state, action: { payload: StateType | undefined }) {
          const payload = action.payload;
          console.log("storing filter check payload", payload);
 
-         state.filters = payload.filters || "";
-         state.sort = payload.sort || "";
+         state.filters = payload?.filters || initialState.filters;
+         state.sort = payload?.sort || initialState.sort;
       },
    },
 });

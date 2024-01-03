@@ -18,7 +18,7 @@ import DefaultLayout from "@/layouts/DefaultLayout";
 
 const routes = {
    HOME: "",
-   CATEGORY: "/:category",
+   CATEGORY: "/:category_ascii",
    LOGIN: "/login",
    REGISTER: "/register",
    SEARCH: "/search/:key",

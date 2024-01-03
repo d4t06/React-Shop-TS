@@ -6,6 +6,7 @@ import { Button } from "../";
 import styles from "./Gallery.module.scss";
 import usePrivateRequest from "@/hooks/usePrivateRequest";
 import { ImageType } from "@/types";
+import { sleep } from "@/utils/appHelper";
 
 const cx = classNames.bind(styles);
 
@@ -13,6 +14,8 @@ type Props = {
    setImageUrl: (image_url: string) => void;
    setIsOpenModal: Dispatch<SetStateAction<boolean>>;
 };
+
+const IMAGE_URL = "/image-management/images";
 
 function Gallery({ setImageUrl, setIsOpenModal }: Props) {
    const [images, setImages] = useState<ImageType[]>([]);
@@ -57,7 +60,7 @@ function Gallery({ setImageUrl, setIsOpenModal }: Props) {
 
          const controller = new AbortController();
 
-         const res = await privateRequest.post("/images", formData, {
+         const res = await privateRequest.post(IMAGE_URL, formData, {
             headers: { "Content-Type": "multipart/form-data" },
             signal: controller.signal,
          });
@@ -80,9 +83,7 @@ function Gallery({ setImageUrl, setIsOpenModal }: Props) {
          setApiLoading(true);
          const controller = new AbortController();
 
-         await privateRequest.post(`/images/delete`, active, {
-            signal: controller.signal,
-         });
+         await privateRequest.delete(`${IMAGE_URL}/${active.id}`);
 
          const newImages = images.filter((image) => image.image_file_path !== active.image_file_path);
          setImages(newImages);
@@ -99,8 +100,10 @@ function Gallery({ setImageUrl, setIsOpenModal }: Props) {
 
    const getImages = async () => {
       try {
-         const res = await privateRequest.get("/images"); //res.data
+         const res = await privateRequest.get(IMAGE_URL); //res.data
          setImages(res.data);
+
+         if (import.meta.env.DEV) await sleep(300)
          setStatus("success");
       } catch (error) {
          console.log({ message: error });
@@ -119,9 +122,9 @@ function Gallery({ setImageUrl, setIsOpenModal }: Props) {
       <div className={cx("gallery")}>
          <div className={cx("gallery__top")}>
             <div className={cx("left")}>
-               <h1>Images</h1>
+               <h1 className="text-2xl font-semibold">Images</h1>
                <div>
-                  <label className={cx("input-label")} htmlFor="input-file">
+                  <label className={cx("input-label" ,{disable: apiLoading})} htmlFor="input-file">
                      <i className="material-icons">add</i>
                      Upload
                   </label>
@@ -135,13 +138,13 @@ function Gallery({ setImageUrl, setIsOpenModal }: Props) {
                </div>
             </div>
 
-            <Button className={cx("choose-image-btn")} disable={!active} rounded fill onClick={handleChoose}>
+            <Button className={cx("choose-image-btn")} disable={!active} primary onClick={handleChoose}>
                Chọn
             </Button>
          </div>
          <div className={cx("gallery__body")}>
-            <div className={cx("row", "container")}>
-               <div className={cx("col col-8", "left")}>
+            <div className={cx("row large", "container")}>
+               <div className={cx("col-large col-8 no-scrollbar", "left")}>
                   {status === "loading" && <h1>Loading...</h1>}
 
                   {status !== "loading" && (
@@ -155,7 +158,7 @@ function Gallery({ setImageUrl, setIsOpenModal }: Props) {
                                           <div
                                              onClick={() => setActive(item)}
                                              className={cx("image-frame", {
-                                                active: active ? active.image_url === item.image_url : false,
+                                                active: active ? active.id === item.id : false,
                                              })}
                                           >
                                              <img src={item.image_url} alt="img" />
@@ -170,22 +173,22 @@ function Gallery({ setImageUrl, setIsOpenModal }: Props) {
                      </>
                   )}
                </div>
-               <div className={cx("col col-4", "image-info-container")}>
+               <div className={cx("col-large col-4 overflow-hidden border-l-[2px]")}>
                   {active && (
                      <div className={cx("image-info")}>
-                        <h2>{active.name}</h2>
+                        <h2 className="break-words">{active.name}</h2>
                         <ul>
                            <li>
-                              <h4>Image path:</h4>{" "}
+                              <h4 className="font-semibold">Image path:</h4>{" "}
                               <a target="blank" href={active.image_url}>
                                  {active.image_url}
                               </a>
                            </li>
                            <li>
-                              <h4>Size:</h4> {formatSize(active.size)}
+                              <h4 className="font-semibold">Size:</h4> {formatSize(active.size)}
                            </li>
                         </ul>
-                        <Button fill rounded onClick={handleDeleteImage}>
+                        <Button primary onClick={handleDeleteImage}>
                            Xóa
                         </Button>
                      </div>

@@ -10,51 +10,34 @@ import { routes } from "@/routes";
 import { publicRequest } from "@/utils/request";
 import { Category } from "@/types";
 import { useApp } from "@/store/AppContext";
+import useAppConfig from "@/hooks/useAppConfig";
 
 const cx = classNames.bind(styles);
 
 function Header() {
    const { auth } = useAuth();
-   const { categories, setCategories } = useApp();
    const [showModal, setShowModal] = useState(false);
    const defaultImage = "src/assets/images/avatar.jpg";
 
    const ranUseEffect = useRef(false);
-   const decode: any = auth?.token ? jwtDecode(auth.token) : undefined;
 
+   // use hooks
    const location = useLocation();
+   const { categories } = useApp();
+   const { status } = useAppConfig({ curCategory: undefined });
+   const decode: any = auth?.token ? jwtDecode(auth.token) : undefined;
 
    const renderCategories = useMemo(() => {
       if (!categories.length) return;
       return categories.map((cat, index) => (
-         <li key={index} className={cx("nav-item", { active: location.pathname === "/" + cat.category_name_ascii })}>
-            <Link to={`/${cat.category_name_ascii}`}>
+         <li key={index} className={cx("nav-item", { active: location.pathname === "/" + cat.category_ascii })}>
+            <Link to={`/${cat.category_ascii}`}>
                <i className="material-icons">{cat.icon}</i>
                <p className={cx("nav-text")}>{cat.category_name}</p>
             </Link>
          </li>
       ));
    }, [categories, location]);
-
-   useEffect(() => {
-      const getConfig = async () => {
-         try {
-            const categoriesRes = await publicRequest.get("app/category");
-            const categories = categoriesRes.data as Category[];
-
-            if (categories.length > 0) {
-               setCategories(categoriesRes.data || []);
-            }
-         } catch (error) {
-            console.log({ message: error });
-         }
-      };
-
-      if (!ranUseEffect.current) {
-         ranUseEffect.current = true;
-         getConfig();
-      }
-   }, []);
 
    return (
       <>
@@ -90,7 +73,15 @@ function Header() {
             </div>
             <div className={cx("header-nav")}>
                <div className={cx("container", "header-nav-wrap")}>
-                  <ul className={cx("nav-list")}>{renderCategories}</ul>
+                  <ul className={cx("nav-list")}>
+                     {status === "loading" && <p className="text-2xl">loading...</p>}
+                     {status !== "loading" && (
+                        <>
+                           {status === "success" && renderCategories}
+                           {status === "error" && <p className="text-2xl">Error</p>}
+                        </>
+                     )}
+                  </ul>
                   {!decode?.username && (
                      <ul className={cx("nav-list", "left-nav-list")}>
                         <li className={cx("nav-item")}>

@@ -6,18 +6,22 @@
    left: 0;
    background-color: rgba($color: #000000, $alpha: 0.6);
    z-index: 99;
+   &.child {
+      background-color: rgba($color: #000000, $alpha: 0.3);
+   }
 }
 .overlay.on {
    position: fixed;
    pointer-events: unset;
 }
 .modal {
-   transition: all .3s linear;
+   transition: all 0.3s linear;
    position: fixed;
    top: 50%;
    left: 50%;
    transform: translate(-50%, -50%);
    z-index: 99;
-
+   padding: 15px 20px;
+   background: #fff;
+   border-radius: 8px;
 }
-

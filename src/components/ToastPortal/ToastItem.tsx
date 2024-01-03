@@ -26,7 +26,7 @@ export default function ToastItem({ toast, onClick }: Props) {
          {toast.title && (
             <>
                {toast.title === "success" && <i className="material-icons ">check</i>}
-               {toast.title === "error" && <i className="material-icons">close</i>}
+               {toast.title === "error" && <i className="material-icons">report</i>}
             </>
          )}
          <p className={cx("text")}>{toast.desc}</p>

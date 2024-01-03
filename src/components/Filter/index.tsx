@@ -12,6 +12,7 @@ import Radiobox from "./child/Radiobox";
 import { AppDispatch } from "@/store/store";
 import { useMemo } from "react";
 import Skeleton from "../Skeleton";
+import { Brand } from "@/types";
 
 const cx = classNames.bind(styles);
 
@@ -20,13 +21,13 @@ type Props = { category: string; loading: boolean };
 function ProductFilter({ category, loading }: Props) {
    const dispatch = useDispatch<AppDispatch>();
    const { sort, filters: filtersInStore } = useSelector(selectedAllFilter);
-   const { status } = useSelector(selectedAllProduct);
+   const { status, category_id } = useSelector(selectedAllProduct);
 
    const showFilteredResults = (filters: FilterType) => {
-      dispatch(fetchProducts({ page: 1, sort, category, filters }));
+      dispatch(fetchProducts({ page: 1, sort, category_id, filters }));
    };
 
-   const handleFilter = (field: string[], by: keyof FilterType) => {
+   const handleFilter = (field: Brand[], by: keyof FilterType) => {
       let newFilters = { ...filtersInStore };
 
       newFilters[by] = field;
@@ -60,7 +61,7 @@ function ProductFilter({ category, loading }: Props) {
                   ) : (
                      <Checkbox
                         filters={filtersInStore}
-                        handleFilter={(filters) => handleFilter(filters, "brand")}
+                        handleFilter={(filters) => handleFilter(filters, "brands")}
                         category={category}
                      />
                   )}
@@ -71,15 +72,15 @@ function ProductFilter({ category, loading }: Props) {
             <div className={cx("filter-section")}>
                <h1 className={cx("filter-title")}>Mức giá</h1>
                <div className={cx("filter-list", "price")}>
-                  {loading ? (
+                  {/* {loading ? (
                      PriceSkeleton
                   ) : (
                      <Radiobox
                         filters={filtersInStore}
-                        handleFilter={(filter) => handleFilter(filter, "price")}
+                        handleFilter={(filter) => handleFilter(filter, "")}
                         category={category}
                      />
-                  )}
+                  )} */}
                </div>
             </div>
          </div>

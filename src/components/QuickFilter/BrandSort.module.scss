@@ -4,25 +4,36 @@ $alpha: rgba(
 );
 
 .container {
-   display: flex;
-   flex-wrap: wrap;
-   align-items: center;
-   width: 100%;
    border-radius: 12px;
-   border: 1px solid #e1e1e1;
-   column-gap: 10px;
-   row-gap: 10px;
-   padding: 15px 14px;
-   .brand-sort {
-      width: 100%;
+   background-color: #fff;
+   padding: 14px;
+   // &.border {
+   border: 1px solid rgba($color: #000000, $alpha: 0.1);
+   // }
+   .brand-list {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      column-gap: 10px;
+      row-gap: 10px;
+      & + .brand-list {
+         margin-top: 10px;
+      }
    }
 }
 .sort-item {
    width: 150px;
    height: 35px;
+   border-radius: 99px;
+   border: 1px solid $alpha;
+   overflow: hidden;
+
+   &.no-image {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+   }
    img {
-      border-radius: 99px;
-      border: 1px solid $alpha;
       height: 100%;
       width: 100%;
       object-fit: cover;
@@ -32,18 +43,6 @@ $alpha: rgba(
       }
    }
 }
-
-// .brand-sort {
-//    width: 100%;
-//    h1 {
-//       display: inline;
-//    }
-//    .count {
-//       color: #cd1818;
-//       margin-left: 15px;
-//    }
-
-// }
 
 .filter-item {
    display: flex;
@@ -81,7 +80,6 @@ $alpha: rgba(
       padding-top: 3px;
    }
 }
-
 
 // admin
 .brand-name {

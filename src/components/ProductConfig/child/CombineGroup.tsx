@@ -1,8 +1,7 @@
 import { Ref, forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { moneyFormat } from "@/utils/appHelper";
-import { ProductCombine } from "@/types";
-import { usePrivateRequest } from "@/hooks";
 import Input from "@/components/ui/Input";
+import { ProductCombine } from "@/types";
 
 type InputGroupProps = {
    initCombine: ProductCombine;
@@ -10,18 +9,14 @@ type InputGroupProps = {
 };
 
 export type CombineRef = {
-   submit: () => Promise<ProductCombine | undefined>;
+   submit: () => { data: ProductCombine; type: "new" | "update" } | undefined;
    validate: () => boolean;
 };
-
-const COMBINE_URL = "/combine-management";
 
 function InputGroup({ initCombine, isExist }: InputGroupProps, ref: Ref<CombineRef>) {
    const [combineData, setCombineData] = useState<ProductCombine>(initCombine);
    const stockCombine = useRef(initCombine);
    const [error, setError] = useState(false);
-
-   const privateRequest = usePrivateRequest();
 
    const handleInput = (field: keyof typeof combineData, value: string) => {
       setError(false);
@@ -45,39 +40,22 @@ function InputGroup({ initCombine, isExist }: InputGroupProps, ref: Ref<CombineR
    };
 
    const validate = () => {
-      console.log("validate check price", combineData.price);
-
       if (!combineData.price) {
          setError(true);
          return true;
-         // throw new Error("Price is missing");
       } else return false;
    };
 
-   const submit = async () => {
-      try {
-         // let newCombines : ProductCombine[] = []
-         // let updateCombines : ProductCombine[] | undefined = []
-         const status = trackingCombine();
-         switch (status) {
-            case "new":
-               // await privateRequest.post(COMBINE_URL, combineData, {
-               //    headers: { "Content-Type": "application/json" },
-               // });
-               return combineData;
-            case "update":
-               console.log("update");
-               await privateRequest.post(COMBINE_URL + "/update", combineData, {
-                  headers: { "Content-Type": "application/json" },
-               });
-               return;
-            case "unChange":
-               console.log("unChange combine");
-               return;
-         }
-      } catch (error) {
-         console.log({ message: error });
-         throw new Error("error");
+   const submit: CombineRef["submit"] = () => {
+      const status = trackingCombine();
+      switch (status) {
+         case "new":
+            return { data: combineData, type: "new" };
+         case "update":
+            return { data: combineData, type: "update" };
+         case "unChange":
+            console.log("unChange combine");
+            return;
       }
    };
 
@@ -91,6 +69,7 @@ function InputGroup({ initCombine, isExist }: InputGroupProps, ref: Ref<CombineR
          <div className="row">
             <div className="col col-6">
                <Input
+                  type="number"
                   placeholder="Quantity"
                   value={combineData.quantity}
                   cb={(value) => handleInput("quantity", value)}
@@ -99,6 +78,7 @@ function InputGroup({ initCombine, isExist }: InputGroupProps, ref: Ref<CombineR
 
             <div className="col col-6">
                <Input
+                  type="text"
                   className={error ? "bg-red-200" : ""}
                   placeholder="Price"
                   value={moneyFormat(combineData.price || "")}
